@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+	<link rel="stylesheet" type="text/css" href="style.css">
+    <title>Interactive Audio Visuals</title>
+  </head>
+  <body>
+  <div id="writing">
+    <font size="7"> USING WEB AUDIO API WITH THREE.JS </font>
+	<p>Hello.  Today we will be learning about making a super basic interactive audio/visual web page with the use of Web Audio API and three.js.<br>
+	You can see an example <a href="https://web.engr.oregonstate.edu/~eldridgs/howtothree/samplehtml.html">here</a>.<br><br>
+	First off, I need to direct you to the three.js webpage's "<a href="http://threejs.org/docs/index.html#Manual/Introduction/Creating_a_scene">getting started</a>" section where you can go through the spinning cube example.<br>
+	We will be using the cube example today to make the cube react to the audio input.<br>
+	Now, we need to make a simple HTML file:<br>
+	</p>
+  </div>
+  <div id="code">
+    <pre><code>
+&lt;!DOCTYPE html>
+&lt;html>
+	&lt;head>
+        &lt;meta charset="UTF-8"
+        &lt;title>Audios and Visuals</title>
+    &lt;/head>
+    &lt;body>
+      &lt;button class="play">Play</button>
+      &lt;button class="stop">Stop</button>
+	&lt;/body>
+	&lt;script src='js/three.min.js'></script>
+	&lt;script src='samplejs.js'></script>	
+&lt;/html>
+	</code></pre>
+  </div>
+  <div id="writing">
+  <p> Let's take a look at what this HTML code is doing.<br>
+  First, you'll see &lt;!DOCTYPE html>.  This tells the browser which version of HTML you are using.<br><br>
+  Next, you have the &lt;html> which is the opening tag for your actual code.<br>
+  You'll notice that &lt;/html> is the last thing.  This closes the first tag you opened.<br>  
+  In general, the first thing you open is the last thing you close.<br><br>
+  The next tag is &lt;head>.  The title inside of the head is what you'll see on your web browser's tab.<br>
+  &lt;meta charset="UTF-8" specifies the character encoding for the HTML document.<br><br>
+  Next, we open the body of the HTML.  Here we will see two buttons with class "play" and "stop".<br>
+  These will be used by our javascript file to play and stop the audio file.<br>
+  We don't want to create one of those noisy websites that cant be stopped!<br><br>
+  After the body, we have some &lt;script> tags.  "src" stands for source code.  These are the names of the javascript files we need access to.<br>
+  The first one is called "js/three.min.js".  The "js/" part means that it is inside of a folder called "js".<br>
+  This file comes directly from the three.js website.  It is used to create our spinning cube.<br>
+  The second file, "sample.js" is in the same folder as our HTML file, so it does not need the "js/" part.<br>
+  This is the main file we will be working with today.  You can see the whole file at the end, but we will go step by step first.<br><br>
+  First, we will create the audio context and make some variables we will be using:<br>
+  </p>
+  </div>
+  <div id="code"><pre>
+  //create audio context
+var audioCtx = new window.AudioContext();
+var source;
+var scriptSource;
+var buffer;
+var analyser;
+var myArray;
+var speed = 0;
+var yes = 0;
+  </pre></div>
+  <div id="writing">
+  <br>
+  <p>Next, we are going to create our cube.  You should recognize this from the three.js site.  You'll notice we changed<br>
+  to a MeshNormalMaterial instead of the MeshBasicMaterial from the example.
+  </div>
+  <div id="code"><pre>
+  //create cube
+var scene = new THREE.Scene(); 
+var camera = new THREE.PerspectiveCamera( 35, window.innerWidth/window.innerHeight, 0.1, 1000 ); 
+var renderer = new THREE.WebGLRenderer(); renderer.setSize( window.innerWidth, window.innerHeight ); 
+document.body.appendChild( renderer.domElement ); 
+
+var geometry = new THREE.BoxGeometry( 1, 1, 1 ); 
+var material = new THREE.MeshNormalMaterial(); 
+var cube = new THREE.Mesh( geometry, material ); scene.add( cube ); camera.position.z = 5; 
+  </div></pre>
+  <div id="writing">
+  <br>
+  <p>This next part is going to tell the javascript that those buttons we made in HTML are going to be used as variables.</p>
+  </div>
+  <div id="code"><pre>
+var play = document.querySelector('.play');
+var stop = document.querySelector('.stop');
+</div></pre>
+
+<div id="writing">
+<br>
+<p>Now, we will create a <a href="https://developer.mozilla.org/en-US/docs/Web/API/ScriptProcessorNode">script node</a>.  This will allow us to create data to use to change our cube size.</p>
+</div>
+
+<div id="code"><pre>
+scriptSource = audioCtx.createScriptProcessor(2048, 1, 1);
+  scriptSource.buffer = buffer;
+  scriptSource.connect(audioCtx.destination);
+</pre></div>
+
+<div id="writing">
+<br>
+<p>We also need to create an <a href="https://developer.mozilla.org/en-US/docs/Web/API/AnalyserNode">analyser node</a> that will help the script node generate real time frequency data instead of static data.</p>
+</div>
+
+<div id="code"><pre>
+analyser = audioCtx.createAnalyser();
+  analyser.smoothingTimeConstant = 1;
+  analyser.fftSize = 1024;
+  </pre></div>
+  
+  <div id="writing">
+  <br><p>
+  This next part has a lot going on.  We are creating a function called "getData".<br>
+  We have to create a function here so that we can use this chunk of code again and again.<br>
+  In the first part of this function, we create our <a href="https://developer.mozilla.org/en-US/docs/Web/API/AudioBufferSourceNode">buffer source</a>.  Then we make an XML request,<br>
+  so that this will be able to exchange data with the server.<br>
+  Next you'll see "request.open"; in the parenthesis you'll see the request type (GET), our audio file (this can be anything you want)<br>
+  and "true" means that we want this to be handled asynchronously.<br>
+Inside of this function, we have another function where we <a href="https://developer.mozilla.org/en-US/docs/Web/API/AudioContext/decodeAudioData">decode</a> the audio data. Here, we <a href="https://developer.mozilla.org/en-US/docs/Web/API/AudioNode/connect%28AudioParam%29">connect</a> the source to the analyser<br>
+and the analyser to the speakers.  This is very important.<br>  
+  </div>
+  <div id="code"><pre>
+ function getData() {
+  source = audioCtx.createBufferSource();
+  request = new XMLHttpRequest();
+
+  request.open('GET', 'mysong4meows.ogg', true);
+
+  request.responseType = 'arraybuffer';
+
+
+  request.onload = function() {
+    var audioData = request.response;
+
+    audioCtx.decodeAudioData(audioData, function(buffer) {
+	  
+      source.buffer = buffer;
+      source.connect(analyser);
+	  analyser.connect(audioCtx.destination);
+      source.loop = true;
+	  
+      });
+  }
+  request.send();
+} 
+  </pre></div>
+<div id="writing">
+<br>
+<p> Now, we create a function where we make an array and fill it with information from the analyser.<br>
+Then, we can use the array to scale the cube.  We are also setting the speed of rotation here.  Then, we call get data again.
+</div>
+  <div id="code"><pre>
+  scriptSource.onaudioprocess = function(e) {
+  myArray = new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(myArray);
+  for (var i = 0; i < myArray.length; i++) {
+	if (yes == 1) {
+	  var size = myArray[i]/128;
+	  cube.scale.x = size;
+      cube.scale.y = size;
+      cube.scale.z = size;
+	  speed = 0.009;
+	}
+    else {
+	  speed = 0;
+    }
+  }
+}
+getData();
+  </div></pre>
+  
+  <div id="writing">
+  <br>
+  <p>Now we will render the animation like you saw in the introduction to three.js</p>
+  </div>
+  
+  <div id="code"><pre>
+var render = function () { 
+  requestAnimationFrame( render );
+  cube.rotation.x += speed; 
+  cube.rotation.y += speed; 
+  renderer.render(scene, camera); 
+}; 
+
+render();
+  </pre></div>
+  
+  <div id="writing">
+  <br>
+  <p> Finally, we tell the javascript that if "play" or "stop" are clicked, to run the following functions.<br>
+  When, play is clicked you will see that it calls the getData function and starts the song.</p>
+  </div>
+  
+  <div id="code"><pre>
+  play.onclick = function() {
+  getData();
+  source.start(0);
+  play.setAttribute('disabled', 'disabled');
+  yes = 1;
+}
+
+stop.onclick = function() {
+  source.stop(0);
+  play.removeAttribute('disabled');
+  yes = 0;
+}
+  </pre></div>
+  <div id="writing">
+  <br>
+  <p>The whole script:</p>
+  </div>
+  <div id="code"><pre>
+  //create audio context
+var audioCtx = new window.AudioContext();
+var source;
+var scriptSource;
+var buffer;
+var analyser;
+var myArray;
+var speed = 0;
+var yes = 0;
+
+//create cube
+var scene = new THREE.Scene(); 
+var camera = new THREE.PerspectiveCamera( 35, window.innerWidth/window.innerHeight, 0.1, 1000 ); 
+var renderer = new THREE.WebGLRenderer(); renderer.setSize( window.innerWidth, window.innerHeight ); 
+document.body.appendChild( renderer.domElement ); 
+
+var geometry = new THREE.BoxGeometry( 1, 1, 1 ); 
+var material = new THREE.MeshNormalMaterial(); 
+var cube = new THREE.Mesh( geometry, material ); scene.add( cube ); camera.position.z = 5; 
+
+var play = document.querySelector('.play');
+var stop = document.querySelector('.stop');
+
+scriptSource = audioCtx.createScriptProcessor(2048, 1, 1);
+  scriptSource.buffer = buffer;
+  scriptSource.connect(audioCtx.destination);
+
+analyser = audioCtx.createAnalyser();
+  analyser.smoothingTimeConstant = 1;
+  analyser.fftSize = 1024;
+	  
+function getData() {
+  source = audioCtx.createBufferSource();
+  request = new XMLHttpRequest();
+
+  request.open('GET', 'mysong4meows.ogg', true);
+
+  request.responseType = 'arraybuffer';
+
+
+  request.onload = function() {
+    var audioData = request.response;
+
+    audioCtx.decodeAudioData(audioData, function(buffer) {
+	  
+      source.buffer = buffer;
+      source.connect(analyser);
+	  analyser.connect(audioCtx.destination);
+      source.loop = true;
+	  
+      });
+  }
+  request.send();
+}
+scriptSource.onaudioprocess = function(e) {
+  myArray = new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(myArray);
+  for (var i = 0; i &lt; myArray.length; i++) {
+	if (yes == 1) {
+	  var size = myArray[i]/128;
+	  cube.scale.x = size;
+      cube.scale.y = size;
+      cube.scale.z = size;
+	  speed = 0.009;
+	}
+    else {
+	  speed = 0;
+    }
+  }
+}
+getData();
+
+var render = function () { 
+  requestAnimationFrame( render );
+  cube.rotation.x += speed; 
+  cube.rotation.y += speed; 
+  renderer.render(scene, camera); 
+}; 
+
+render();
+
+// wire up buttons to stop and play audio
+
+play.onclick = function() {
+  getData();
+  source.start(0);
+  play.setAttribute('disabled', 'disabled');
+  yes = 1;
+}
+
+stop.onclick = function() {
+  source.stop(0);
+  play.removeAttribute('disabled');
+  yes = 0;
+}
+  </pre></div>
+  <br>
+  <br>
+  <div id="writing">
+  <p>Here are some helpful links:<br>
+  <a href="http://threejs.org/">three.js</a><br>
+  <a href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API">Web Audio API</a><br>
+  <a href="http://24ways.org/2013/make-your-browser-dance/">Make Your Broswer Dance</a><br>
+  <a href="http://youtu.be/F3sJ5k1QFJs">Full Three Js Example on YouTube</a><br>
+  <a href="http://www.airtightinteractive.com/2013/10/making-audio-reactive-visuals/">Making Audio Reactive Visuals</a><br>
+  <a href="http://www.html5rocks.com/en/tutorials/webaudio/intro/">Getting Started with Web Audio API</a><br>
+  <a href="http://srchea.com/experimenting-with-web-audio-api-three-js-webgl">Experimenting with Web Audio API + three.js</a><br>
+  <a href="http://www.michaelbromley.co.uk/blog/42/audio-visualization-with-web-audio-canvas-and-the-soundcloud-api">Audio Visualization with Web Audio, Canvas and the Soundcloud API</a><br>
+  <a href="https://www.izotope.com/support/kb/index.php/kb/article/503-What_is_Buffer_Size_and_why_is_it_important">What is Buffer Size and why is it important?</a><br>
+  </div>
+  </body>
+</html>
